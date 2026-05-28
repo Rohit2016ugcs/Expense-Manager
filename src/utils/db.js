@@ -3,6 +3,8 @@ import initSqlJs from 'sql.js';
 let db = null;
 let SQL = null;
 
+export const getDB = () => db;
+
 export const initDB = async () => {
   try {
     // Initialize SQL.js with local WASM files from public folder
@@ -15,10 +17,34 @@ export const initDB = async () => {
     if (savedDb) {
       const uint8Array = new Uint8Array(JSON.parse(savedDb));
       db = new SQL.Database(uint8Array);
+      
+      // Check if users table exists, if not perform migration
+      const tableCheck = db.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='users'");
+      if (tableCheck.length === 0) {
+        // Old database without authentication - need to migrate or reset
+        console.warn('Old database detected. Clearing and creating new schema with authentication...');
+        
+        // Clear old database
+        localStorage.removeItem('expenseDB');
+        
+        // Create new database with proper schema
+        db = new SQL.Database();
+        createTables();
+      } else {
+        // Check if user_id column exists in expenses table (to verify migration)
+        try {
+          db.exec("SELECT user_id FROM expenses LIMIT 1");
+        } catch (e) {
+          // user_id column doesn't exist - need full migration
+          console.warn('Database schema mismatch. Clearing and creating new schema...');
+          localStorage.removeItem('expenseDB');
+          db = new SQL.Database();
+          createTables();
+        }
+      }
     } else {
       db = new SQL.Database();
       createTables();
-      insertDefaultCategories();
     }
 
     return true;
@@ -28,11 +54,36 @@ export const initDB = async () => {
   }
 };
 
+const createUserTable = () => {
+  db.run(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      password TEXT NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  saveDB();
+};
+
 const createTables = () => {
+  // Users table
+  db.run(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      password TEXT NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
   // Expenses table
   db.run(`
     CREATE TABLE IF NOT EXISTS expenses (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
       amount REAL NOT NULL,
       category_id INTEGER NOT NULL,
       description TEXT,
@@ -42,6 +93,7 @@ const createTables = () => {
       tags TEXT,
       receipt_url TEXT,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id),
       FOREIGN KEY (category_id) REFERENCES categories(id)
     )
   `);
@@ -50,12 +102,14 @@ const createTables = () => {
   db.run(`
     CREATE TABLE IF NOT EXISTS categories (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL UNIQUE,
+      user_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
       icon TEXT,
       color TEXT,
       type TEXT NOT NULL CHECK(type IN ('income', 'expense')),
       budget_limit REAL DEFAULT 0,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id)
     )
   `);
 
@@ -63,6 +117,7 @@ const createTables = () => {
   db.run(`
     CREATE TABLE IF NOT EXISTS budgets (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
       category_id INTEGER,
       amount REAL NOT NULL,
       period TEXT NOT NULL CHECK(period IN ('daily', 'weekly', 'monthly', 'yearly')),
@@ -70,6 +125,7 @@ const createTables = () => {
       end_date TEXT NOT NULL,
       alert_threshold REAL DEFAULT 80,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id),
       FOREIGN KEY (category_id) REFERENCES categories(id)
     )
   `);
@@ -78,6 +134,7 @@ const createTables = () => {
   db.run(`
     CREATE TABLE IF NOT EXISTS recurring_expenses (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
       amount REAL NOT NULL,
       category_id INTEGER NOT NULL,
       description TEXT,
@@ -89,6 +146,7 @@ const createTables = () => {
       type TEXT NOT NULL CHECK(type IN ('income', 'expense')),
       payment_method TEXT,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id),
       FOREIGN KEY (category_id) REFERENCES categories(id)
     )
   `);
@@ -97,19 +155,21 @@ const createTables = () => {
   db.run(`
     CREATE TABLE IF NOT EXISTS savings_goals (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
       name TEXT NOT NULL,
       target_amount REAL NOT NULL,
       current_amount REAL DEFAULT 0,
       deadline TEXT,
       description TEXT,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id)
     )
   `);
 
   saveDB();
 };
 
-const insertDefaultCategories = () => {
+export const insertDefaultCategories = (userId) => {
   const defaultCategories = [
     // Expense categories
     { name: 'Food & Dining', icon: '🍔', color: '#ef4444', type: 'expense' },
@@ -132,9 +192,9 @@ const insertDefaultCategories = () => {
     { name: 'Other Income', icon: '💵', color: '#6ee7b7', type: 'income' }
   ];
 
-  const stmt = db.prepare('INSERT INTO categories (name, icon, color, type) VALUES (?, ?, ?, ?)');
+  const stmt = db.prepare('INSERT INTO categories (user_id, name, icon, color, type) VALUES (?, ?, ?, ?, ?)');
   defaultCategories.forEach(cat => {
-    stmt.run([cat.name, cat.icon, cat.color, cat.type]);
+    stmt.run([userId, cat.name, cat.icon, cat.color, cat.type]);
   });
   stmt.free();
   saveDB();
@@ -148,12 +208,13 @@ export const saveDB = () => {
 };
 
 // Expense operations
-export const addExpense = (expense) => {
+export const addExpense = (expense, userId) => {
   const stmt = db.prepare(`
-    INSERT INTO expenses (amount, category_id, description, date, type, payment_method, tags, receipt_url)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO expenses (user_id, amount, category_id, description, date, type, payment_method, tags, receipt_url)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   stmt.run([
+    userId,
     expense.amount,
     expense.category_id,
     expense.description,
@@ -194,14 +255,14 @@ export const deleteExpense = (id) => {
   saveDB();
 };
 
-export const getExpenses = (filters = {}) => {
+export const getExpenses = (userId, filters = {}) => {
   let query = `
     SELECT e.*, c.name as category_name, c.icon as category_icon, c.color as category_color
     FROM expenses e
     LEFT JOIN categories c ON e.category_id = c.id
-    WHERE 1=1
+    WHERE e.user_id = ?
   `;
-  const params = [];
+  const params = [userId];
 
   if (filters.type) {
     query += ' AND e.type = ?';
@@ -240,25 +301,26 @@ export const getExpenses = (filters = {}) => {
 
   return result[0].values.map(row => ({
     id: row[0],
-    amount: row[1],
-    category_id: row[2],
-    description: row[3],
-    date: row[4],
-    type: row[5],
-    payment_method: row[6],
-    tags: row[7],
-    receipt_url: row[8],
-    created_at: row[9],
-    category_name: row[10],
-    category_icon: row[11],
-    category_color: row[12]
+    user_id: row[1],
+    amount: row[2],
+    category_id: row[3],
+    description: row[4],
+    date: row[5],
+    type: row[6],
+    payment_method: row[7],
+    tags: row[8],
+    receipt_url: row[9],
+    created_at: row[10],
+    category_name: row[11],
+    category_icon: row[12],
+    category_color: row[13]
   }));
 };
 
 // Category operations
-export const addCategory = (category) => {
-  const stmt = db.prepare('INSERT INTO categories (name, icon, color, type, budget_limit) VALUES (?, ?, ?, ?, ?)');
-  stmt.run([category.name, category.icon, category.color, category.type, category.budget_limit || 0]);
+export const addCategory = (category, userId) => {
+  const stmt = db.prepare('INSERT INTO categories (user_id, name, icon, color, type, budget_limit) VALUES (?, ?, ?, ?, ?, ?)');
+  stmt.run([userId, category.name, category.icon, category.color, category.type, category.budget_limit || 0]);
   stmt.free();
   saveDB();
 };
@@ -275,12 +337,12 @@ export const deleteCategory = (id) => {
   saveDB();
 };
 
-export const getCategories = (type = null) => {
-  let query = 'SELECT * FROM categories';
-  const params = [];
+export const getCategories = (userId, type = null) => {
+  let query = 'SELECT * FROM categories WHERE user_id = ?';
+  const params = [userId];
   
   if (type) {
-    query += ' WHERE type = ?';
+    query += ' AND type = ?';
     params.push(type);
   }
   
@@ -291,22 +353,24 @@ export const getCategories = (type = null) => {
 
   return result[0].values.map(row => ({
     id: row[0],
-    name: row[1],
-    icon: row[2],
-    color: row[3],
-    type: row[4],
-    budget_limit: row[5],
-    created_at: row[6]
+    user_id: row[1],
+    name: row[2],
+    icon: row[3],
+    color: row[4],
+    type: row[5],
+    budget_limit: row[6],
+    created_at: row[7]
   }));
 };
 
 // Budget operations
-export const addBudget = (budget) => {
+export const addBudget = (budget, userId) => {
   const stmt = db.prepare(`
-    INSERT INTO budgets (category_id, amount, period, start_date, end_date, alert_threshold)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO budgets (user_id, category_id, amount, period, start_date, end_date, alert_threshold)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
   stmt.run([
+    userId,
     budget.category_id || null,
     budget.amount,
     budget.period,
@@ -318,29 +382,31 @@ export const addBudget = (budget) => {
   saveDB();
 };
 
-export const getBudgets = () => {
+export const getBudgets = (userId) => {
   const query = `
     SELECT b.*, c.name as category_name, c.icon as category_icon, c.color as category_color
     FROM budgets b
     LEFT JOIN categories c ON b.category_id = c.id
+    WHERE b.user_id = ?
     ORDER BY b.created_at DESC
   `;
 
-  const result = db.exec(query);
+  const result = db.exec(query, [userId]);
   if (result.length === 0) return [];
 
   return result[0].values.map(row => ({
     id: row[0],
-    category_id: row[1],
-    amount: row[2],
-    period: row[3],
-    start_date: row[4],
-    end_date: row[5],
-    alert_threshold: row[6],
-    created_at: row[7],
-    category_name: row[8],
-    category_icon: row[9],
-    category_color: row[10]
+    user_id: row[1],
+    category_id: row[2],
+    amount: row[3],
+    period: row[4],
+    start_date: row[5],
+    end_date: row[6],
+    alert_threshold: row[7],
+    created_at: row[8],
+    category_name: row[9],
+    category_icon: row[10],
+    category_color: row[11]
   }));
 };
 
@@ -350,13 +416,14 @@ export const deleteBudget = (id) => {
 };
 
 // Recurring expense operations
-export const addRecurringExpense = (expense) => {
+export const addRecurringExpense = (expense, userId) => {
   const stmt = db.prepare(`
     INSERT INTO recurring_expenses 
-    (amount, category_id, description, frequency, start_date, end_date, next_occurrence, type, payment_method)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (user_id, amount, category_id, description, frequency, start_date, end_date, next_occurrence, type, payment_method)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   stmt.run([
+    userId,
     expense.amount,
     expense.category_id,
     expense.description,
@@ -371,34 +438,35 @@ export const addRecurringExpense = (expense) => {
   saveDB();
 };
 
-export const getRecurringExpenses = () => {
+export const getRecurringExpenses = (userId) => {
   const query = `
     SELECT r.*, c.name as category_name, c.icon as category_icon, c.color as category_color
     FROM recurring_expenses r
     LEFT JOIN categories c ON r.category_id = c.id
-    WHERE r.is_active = 1
+    WHERE r.user_id = ? AND r.is_active = 1
     ORDER BY r.next_occurrence
   `;
 
-  const result = db.exec(query);
+  const result = db.exec(query, [userId]);
   if (result.length === 0) return [];
 
   return result[0].values.map(row => ({
     id: row[0],
-    amount: row[1],
-    category_id: row[2],
-    description: row[3],
-    frequency: row[4],
-    start_date: row[5],
-    end_date: row[6],
-    next_occurrence: row[7],
-    is_active: row[8],
-    type: row[9],
-    payment_method: row[10],
-    created_at: row[11],
-    category_name: row[12],
-    category_icon: row[13],
-    category_color: row[14]
+    user_id: row[1],
+    amount: row[2],
+    category_id: row[3],
+    description: row[4],
+    frequency: row[5],
+    start_date: row[6],
+    end_date: row[7],
+    next_occurrence: row[8],
+    is_active: row[9],
+    type: row[10],
+    payment_method: row[11],
+    created_at: row[12],
+    category_name: row[13],
+    category_icon: row[14],
+    category_color: row[15]
   }));
 };
 
@@ -413,12 +481,12 @@ export const updateRecurringExpenseNextOccurrence = (id, nextDate) => {
 };
 
 // Savings goals operations
-export const addSavingsGoal = (goal) => {
+export const addSavingsGoal = (goal, userId) => {
   const stmt = db.prepare(`
-    INSERT INTO savings_goals (name, target_amount, current_amount, deadline, description)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO savings_goals (user_id, name, target_amount, current_amount, deadline, description)
+    VALUES (?, ?, ?, ?, ?, ?)
   `);
-  stmt.run([goal.name, goal.target_amount, goal.current_amount || 0, goal.deadline || null, goal.description || null]);
+  stmt.run([userId, goal.name, goal.target_amount, goal.current_amount || 0, goal.deadline || null, goal.description || null]);
   stmt.free();
   saveDB();
 };
@@ -439,34 +507,35 @@ export const deleteSavingsGoal = (id) => {
   saveDB();
 };
 
-export const getSavingsGoals = () => {
-  const result = db.exec('SELECT * FROM savings_goals ORDER BY deadline');
+export const getSavingsGoals = (userId) => {
+  const result = db.exec('SELECT * FROM savings_goals WHERE user_id = ? ORDER BY deadline', [userId]);
   if (result.length === 0) return [];
 
   return result[0].values.map(row => ({
     id: row[0],
-    name: row[1],
-    target_amount: row[2],
-    current_amount: row[3],
-    deadline: row[4],
-    description: row[5],
-    created_at: row[6]
+    user_id: row[1],
+    name: row[2],
+    target_amount: row[3],
+    current_amount: row[4],
+    deadline: row[5],
+    description: row[6],
+    created_at: row[7]
   }));
 };
 
 // Statistics
-export const getStatistics = (startDate, endDate) => {
+export const getStatistics = (userId, startDate, endDate) => {
   const query = `
     SELECT 
       type,
       SUM(amount) as total,
       COUNT(*) as count
     FROM expenses
-    WHERE date BETWEEN ? AND ?
+    WHERE user_id = ? AND date BETWEEN ? AND ?
     GROUP BY type
   `;
 
-  const result = db.exec(query, [startDate, endDate]);
+  const result = db.exec(query, [userId, startDate, endDate]);
   const stats = { income: 0, expense: 0, income_count: 0, expense_count: 0 };
 
   if (result.length > 0) {
@@ -484,7 +553,7 @@ export const getStatistics = (startDate, endDate) => {
   return stats;
 };
 
-export const getCategoryStatistics = (startDate, endDate, type = 'expense') => {
+export const getCategoryStatistics = (userId, startDate, endDate, type = 'expense') => {
   const query = `
     SELECT 
       c.id,
@@ -495,12 +564,12 @@ export const getCategoryStatistics = (startDate, endDate, type = 'expense') => {
       COUNT(e.id) as count
     FROM expenses e
     LEFT JOIN categories c ON e.category_id = c.id
-    WHERE e.date BETWEEN ? AND ? AND e.type = ?
+    WHERE e.user_id = ? AND e.date BETWEEN ? AND ? AND e.type = ?
     GROUP BY c.id, c.name, c.icon, c.color
     ORDER BY total DESC
   `;
 
-  const result = db.exec(query, [startDate, endDate, type]);
+  const result = db.exec(query, [userId, startDate, endDate, type]);
   if (result.length === 0) return [];
 
   return result[0].values.map(row => ({
@@ -513,19 +582,19 @@ export const getCategoryStatistics = (startDate, endDate, type = 'expense') => {
   }));
 };
 
-export const getDailyStatistics = (startDate, endDate) => {
+export const getDailyStatistics = (userId, startDate, endDate) => {
   const query = `
     SELECT 
       date,
       type,
       SUM(amount) as total
     FROM expenses
-    WHERE date BETWEEN ? AND ?
+    WHERE user_id = ? AND date BETWEEN ? AND ?
     GROUP BY date, type
     ORDER BY date
   `;
 
-  const result = db.exec(query, [startDate, endDate]);
+  const result = db.exec(query, [userId, startDate, endDate]);
   if (result.length === 0) return [];
 
   return result[0].values.map(row => ({

@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { initDB } from './utils/db';
+import { useAuth } from './context/AuthContext';
+import Auth from './components/Auth';
 import Dashboard from './components/Dashboard';
 import Expenses from './components/Expenses';
 import Categories from './components/Categories';
@@ -15,6 +17,7 @@ function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isLoading, setIsLoading] = useState(true);
   const [isDbReady, setIsDbReady] = useState(false);
+  const { user, logout, loading: authLoading } = useAuth();
 
   useEffect(() => {
     const initialize = async () => {
@@ -25,7 +28,7 @@ function App() {
     initialize();
   }, []);
 
-  if (isLoading) {
+  if (isLoading || authLoading) {
     return (
       <div className="loading-screen">
         <div className="loader"></div>
@@ -40,6 +43,11 @@ function App() {
         <p>⚠️ Failed to initialize database. Please refresh the page.</p>
       </div>
     );
+  }
+
+  // Show auth screen if user is not logged in
+  if (!user) {
+    return <Auth />;
   }
 
   const renderContent = () => {
@@ -71,6 +79,10 @@ function App() {
     <div className="app">
       <header className="app-header">
         <h1>💰 Expense Manager</h1>
+        <div className="user-info">
+          <span>Welcome, {user.name}!</span>
+          <button onClick={logout} className="logout-btn">Logout</button>
+        </div>
       </header>
 
       <nav className="app-nav">

@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { getStatistics, getCategoryStatistics, getDailyStatistics, getExpenses } from '../utils/db';
+import { useAuth } from '../context/AuthContext';
 import { PieChart, Pie, Cell, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 function Dashboard() {
+  const { user } = useAuth();
   const [period, setPeriod] = useState('month');
   const [stats, setStats] = useState({ income: 0, expense: 0, income_count: 0, expense_count: 0 });
   const [categoryStats, setCategoryStats] = useState([]);
@@ -10,22 +12,26 @@ function Dashboard() {
   const [recentExpenses, setRecentExpenses] = useState([]);
 
   useEffect(() => {
-    loadData();
-  }, [period]);
+    if (user) {
+      loadData();
+    }
+  }, [period, user]);
 
   const loadData = () => {
+    if (!user) return;
+    
     const { startDate, endDate } = getDateRange(period);
     
-    const statistics = getStatistics(startDate, endDate);
+    const statistics = getStatistics(user.id, startDate, endDate);
     setStats(statistics);
 
-    const catStats = getCategoryStatistics(startDate, endDate, 'expense');
+    const catStats = getCategoryStatistics(user.id, startDate, endDate, 'expense');
     setCategoryStats(catStats);
 
-    const daily = getDailyStatistics(startDate, endDate);
+    const daily = getDailyStatistics(user.id, startDate, endDate);
     setDailyStats(processDailyData(daily));
 
-    const expenses = getExpenses({ limit: 5 });
+    const expenses = getExpenses(user.id, { limit: 5 });
     setRecentExpenses(expenses);
   };
 
