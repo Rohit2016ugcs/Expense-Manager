@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { getCategories, addCategory, updateCategory, deleteCategory } from '../utils/db';
+import { useAuth } from '../context/AuthContext';
 
 function Categories() {
+  const { user } = useAuth();
   const [categories, setCategories] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
@@ -20,11 +22,14 @@ function Categories() {
   ];
 
   useEffect(() => {
-    loadCategories();
-  }, []);
+    if (user && user.id) {
+      loadCategories();
+    }
+  }, [user]);
 
   const loadCategories = () => {
-    const cats = getCategories();
+    if (!user || !user.id) return;
+    const cats = getCategories(user.id);
     setCategories(cats);
   };
 
@@ -36,6 +41,8 @@ function Categories() {
       return;
     }
 
+    if (!user || !user.id) return;
+
     const categoryData = {
       ...formData,
       budget_limit: parseFloat(formData.budget_limit) || 0
@@ -45,7 +52,7 @@ function Categories() {
       if (editingCategory) {
         updateCategory(editingCategory.id, categoryData);
       } else {
-        addCategory(categoryData);
+        addCategory(categoryData, user.id);
       }
       resetForm();
       loadCategories();

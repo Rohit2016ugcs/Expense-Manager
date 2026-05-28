@@ -72,6 +72,16 @@ export const loginUser = (email, password) => {
       created_at: result[0].values[0][3]
     };
 
+    // Check if user has categories, if not create default ones
+    const categoriesCheck = db.exec('SELECT COUNT(*) as count FROM categories WHERE user_id = ?', [user.id]);
+    const categoryCount = categoriesCheck[0].values[0][0];
+    
+    if (categoryCount === 0) {
+      // User has no categories, insert default ones
+      insertDefaultCategories(user.id);
+      saveDB();
+    }
+
     // Save to localStorage
     localStorage.setItem('currentUser', JSON.stringify(user));
     

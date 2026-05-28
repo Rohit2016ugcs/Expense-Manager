@@ -256,65 +256,76 @@ export const deleteExpense = (id) => {
 };
 
 export const getExpenses = (userId, filters = {}) => {
-  let query = `
-    SELECT e.*, c.name as category_name, c.icon as category_icon, c.color as category_color
-    FROM expenses e
-    LEFT JOIN categories c ON e.category_id = c.id
-    WHERE e.user_id = ?
-  `;
-  const params = [userId];
-
-  if (filters.type) {
-    query += ' AND e.type = ?';
-    params.push(filters.type);
+  // Validate userId
+  if (!userId) {
+    console.error('Invalid userId for getExpenses:', userId);
+    return [];
   }
 
-  if (filters.category_id) {
-    query += ' AND e.category_id = ?';
-    params.push(filters.category_id);
+  try {
+    let query = `
+      SELECT e.*, c.name as category_name, c.icon as category_icon, c.color as category_color
+      FROM expenses e
+      LEFT JOIN categories c ON e.category_id = c.id
+      WHERE e.user_id = ?
+    `;
+    const params = [userId];
+
+    if (filters.type) {
+      query += ' AND e.type = ?';
+      params.push(filters.type);
+    }
+
+    if (filters.category_id) {
+      query += ' AND e.category_id = ?';
+      params.push(filters.category_id);
+    }
+
+    if (filters.startDate) {
+      query += ' AND e.date >= ?';
+      params.push(filters.startDate);
+    }
+
+    if (filters.endDate) {
+      query += ' AND e.date <= ?';
+      params.push(filters.endDate);
+    }
+
+    if (filters.search) {
+      query += ' AND (e.description LIKE ? OR c.name LIKE ?)';
+      params.push(`%${filters.search}%`, `%${filters.search}%`);
+    }
+
+    query += ' ORDER BY e.date DESC, e.id DESC';
+
+    if (filters.limit) {
+      query += ' LIMIT ?';
+      params.push(filters.limit);
+    }
+
+    const result = db.exec(query, params);
+    if (result.length === 0) return [];
+
+    return result[0].values.map(row => ({
+      id: row[0],
+      user_id: row[1],
+      amount: row[2],
+      category_id: row[3],
+      description: row[4],
+      date: row[5],
+      type: row[6],
+      payment_method: row[7],
+      tags: row[8],
+      receipt_url: row[9],
+      created_at: row[10],
+      category_name: row[11],
+      category_icon: row[12],
+      category_color: row[13]
+    }));
+  } catch (error) {
+    console.error('Error in getExpenses:', error);
+    return [];
   }
-
-  if (filters.startDate) {
-    query += ' AND e.date >= ?';
-    params.push(filters.startDate);
-  }
-
-  if (filters.endDate) {
-    query += ' AND e.date <= ?';
-    params.push(filters.endDate);
-  }
-
-  if (filters.search) {
-    query += ' AND (e.description LIKE ? OR c.name LIKE ?)';
-    params.push(`%${filters.search}%`, `%${filters.search}%`);
-  }
-
-  query += ' ORDER BY e.date DESC, e.id DESC';
-
-  if (filters.limit) {
-    query += ' LIMIT ?';
-    params.push(filters.limit);
-  }
-
-  const result = db.exec(query, params);
-  if (result.length === 0) return [];
-
-  return result[0].values.map(row => ({
-    id: row[0],
-    user_id: row[1],
-    amount: row[2],
-    category_id: row[3],
-    description: row[4],
-    date: row[5],
-    type: row[6],
-    payment_method: row[7],
-    tags: row[8],
-    receipt_url: row[9],
-    created_at: row[10],
-    category_name: row[11],
-    category_icon: row[12],
-    category_color: row[13]
-  }));
 };
 
 // Category operations
@@ -525,83 +536,116 @@ export const getSavingsGoals = (userId) => {
 
 // Statistics
 export const getStatistics = (userId, startDate, endDate) => {
-  const query = `
-    SELECT 
-      type,
-      SUM(amount) as total,
-      COUNT(*) as count
-    FROM expenses
-    WHERE user_id = ? AND date BETWEEN ? AND ?
-    GROUP BY type
-  `;
-
-  const result = db.exec(query, [userId, startDate, endDate]);
-  const stats = { income: 0, expense: 0, income_count: 0, expense_count: 0 };
-
-  if (result.length > 0) {
-    result[0].values.forEach(row => {
-      if (row[0] === 'income') {
-        stats.income = row[1];
-        stats.income_count = row[2];
-      } else {
-        stats.expense = row[1];
-        stats.expense_count = row[2];
-      }
-    });
+  // Validate parameters
+  if (!userId || !startDate || !endDate) {
+    console.error('Invalid parameters for getStatistics:', { userId, startDate, endDate });
+    return { income: 0, expense: 0, income_count: 0, expense_count: 0 };
   }
 
-  return stats;
+  try {
+    const query = `
+      SELECT 
+        type,
+        SUM(amount) as total,
+        COUNT(*) as count
+      FROM expenses
+      WHERE user_id = ? AND date BETWEEN ? AND ?
+      GROUP BY type
+    `;
+
+    const result = db.exec(query, [userId, startDate, endDate]);
+    const stats = { income: 0, expense: 0, income_count: 0, expense_count: 0 };
+
+    if (result.length > 0) {
+      result[0].values.forEach(row => {
+        if (row[0] === 'income') {
+          stats.income = row[1];
+          stats.income_count = row[2];
+        } else {
+          stats.expense = row[1];
+          stats.expense_count = row[2];
+        }
+      });
+    }
+
+    return stats;
+  } catch (error) {
+    console.error('Error in getStatistics:', error);
+    return { income: 0, expense: 0, income_count: 0, expense_count: 0 };
+  }
 };
 
 export const getCategoryStatistics = (userId, startDate, endDate, type = 'expense') => {
-  const query = `
-    SELECT 
-      c.id,
-      c.name,
-      c.icon,
-      c.color,
-      SUM(e.amount) as total,
-      COUNT(e.id) as count
-    FROM expenses e
-    LEFT JOIN categories c ON e.category_id = c.id
-    WHERE e.user_id = ? AND e.date BETWEEN ? AND ? AND e.type = ?
-    GROUP BY c.id, c.name, c.icon, c.color
-    ORDER BY total DESC
-  `;
+  // Validate parameters
+  if (!userId || !startDate || !endDate || !type) {
+    console.error('Invalid parameters for getCategoryStatistics:', { userId, startDate, endDate, type });
+    return [];
+  }
 
-  const result = db.exec(query, [userId, startDate, endDate, type]);
-  if (result.length === 0) return [];
+  try {
+    const query = `
+      SELECT 
+        c.id,
+        c.name,
+        c.icon,
+        c.color,
+        SUM(e.amount) as total,
+        COUNT(e.id) as count
+      FROM expenses e
+      LEFT JOIN categories c ON e.category_id = c.id
+      WHERE e.user_id = ? AND e.date BETWEEN ? AND ? AND e.type = ?
+      GROUP BY c.id, c.name, c.icon, c.color
+      ORDER BY total DESC
+    `;
 
-  return result[0].values.map(row => ({
-    id: row[0],
-    name: row[1],
-    icon: row[2],
-    color: row[3],
-    total: row[4],
-    count: row[5]
-  }));
+    const result = db.exec(query, [userId, startDate, endDate, type]);
+    if (result.length === 0) return [];
+
+    return result[0].values.map(row => ({
+      id: row[0],
+      name: row[1],
+      icon: row[2],
+      color: row[3],
+      total: row[4],
+      count: row[5]
+    }));
+  } catch (error) {
+    console.error('Error in getCategoryStatistics:', error);
+    return [];
+  }
 };
 
 export const getDailyStatistics = (userId, startDate, endDate) => {
-  const query = `
-    SELECT 
-      date,
-      type,
-      SUM(amount) as total
-    FROM expenses
-    WHERE user_id = ? AND date BETWEEN ? AND ?
-    GROUP BY date, type
-    ORDER BY date
-  `;
+  // Validate parameters
+  if (!userId || !startDate || !endDate) {
+    console.error('Invalid parameters for getDailyStatistics:', { userId, startDate, endDate });
+    return [];
+  }
 
-  const result = db.exec(query, [userId, startDate, endDate]);
-  if (result.length === 0) return [];
+  try {
+    const query = `
+      SELECT 
+        date,
+        type,
+        SUM(amount) as total
+      FROM expenses
+      WHERE user_id = ? AND date BETWEEN ? AND ?
+      GROUP BY date, type
+      ORDER BY date
+    `;
 
-  return result[0].values.map(row => ({
-    date: row[0],
-    type: row[1],
-    total: row[2]
-  }));
+    const result = db.exec(query, [userId, startDate, endDate]);
+    if (result.length === 0) return [];
+
+    return result[0].values.map(row => ({
+      date: row[0],
+      type: row[1],
+      total: row[2]
+    }));
+  } catch (error) {
+    console.error('Error in getDailyStatistics:', error);
+    return [];
+  }
 };
 
 // Export/Import functions

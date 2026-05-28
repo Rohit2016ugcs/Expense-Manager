@@ -12,27 +12,41 @@ function Dashboard() {
   const [recentExpenses, setRecentExpenses] = useState([]);
 
   useEffect(() => {
-    if (user) {
+    if (user && user.id) {
       loadData();
     }
   }, [period, user]);
 
   const loadData = () => {
-    if (!user) return;
+    if (!user || !user.id) return;
     
-    const { startDate, endDate } = getDateRange(period);
-    
-    const statistics = getStatistics(user.id, startDate, endDate);
-    setStats(statistics);
+    try {
+      const { startDate, endDate } = getDateRange(period);
+      
+      if (!startDate || !endDate) {
+        console.error('Invalid date range');
+        return;
+      }
+      
+      const statistics = getStatistics(user.id, startDate, endDate);
+      setStats(statistics || { income: 0, expense: 0, income_count: 0, expense_count: 0 });
 
-    const catStats = getCategoryStatistics(user.id, startDate, endDate, 'expense');
-    setCategoryStats(catStats);
+      const catStats = getCategoryStatistics(user.id, startDate, endDate, 'expense');
+      setCategoryStats(catStats || []);
 
-    const daily = getDailyStatistics(user.id, startDate, endDate);
-    setDailyStats(processDailyData(daily));
+      const daily = getDailyStatistics(user.id, startDate, endDate);
+      setDailyStats(processDailyData(daily || []));
 
-    const expenses = getExpenses(user.id, { limit: 5 });
-    setRecentExpenses(expenses);
+      const expenses = getExpenses(user.id, { limit: 5 });
+      setRecentExpenses(expenses || []);
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+      // Reset to default values on error
+      setStats({ income: 0, expense: 0, income_count: 0, expense_count: 0 });
+      setCategoryStats([]);
+      setDailyStats([]);
+      setRecentExpenses([]);
+    }
   };
 
   const getDateRange = (period) => {

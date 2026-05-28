@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { getBudgets, addBudget, deleteBudget, getCategories, getExpenses } from '../utils/db';
+import { useAuth } from '../context/AuthContext';
 
 function Budgets() {
+  const { user } = useAuth();
   const [budgets, setBudgets] = useState([]);
   const [categories, setCategories] = useState([]);
   const [showModal, setShowModal] = useState(false);
@@ -13,27 +15,33 @@ function Budgets() {
   });
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (user && user.id) {
+      loadData();
+    }
+  }, [user]);
 
   const loadData = () => {
-    const budgetsList = getBudgets();
+    if (!user || !user.id) return;
+    
+    const budgetsList = getBudgets(user.id);
     const budgetsWithSpent = budgetsList.map(budget => {
       const spent = calculateSpent(budget);
       return { ...budget, spent };
     });
     setBudgets(budgetsWithSpent);
 
-    const cats = getCategories('expense');
+    const cats = getCategories(user.id, 'expense');
     setCategories(cats);
   };
 
   const calculateSpent = (budget) => {
+    if (!user || !user.id) return 0;
+    
     const { start_date, end_date, category_id } = budget;
     const filters = { startDate: start_date, endDate: end_date, type: 'expense' };
     if (category_id) filters.category_id = category_id;
 
-    const expenses = getExpenses(filters);
+    const expenses = getExpenses(user.id, filters);
     return expenses.reduce((sum, exp) => sum + exp.amount, 0);
   };
 
@@ -44,6 +52,8 @@ function Budgets() {
       alert('Please enter budget amount');
       return;
     }
+
+    if (!user || !user.id) return;
 
     const { startDate, endDate } = getDateRange(formData.period);
 
@@ -56,7 +66,7 @@ function Budgets() {
       alert_threshold: parseFloat(formData.alert_threshold)
     };
 
-    addBudget(budgetData);
+    addBudget(budgetData, user.id);
     resetForm();
     loadData();
   };

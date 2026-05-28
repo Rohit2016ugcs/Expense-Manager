@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { getRecurringExpenses, addRecurringExpense, deleteRecurringExpense, updateRecurringExpenseNextOccurrence, getCategories, addExpense } from '../utils/db';
+import { useAuth } from '../context/AuthContext';
 
 function RecurringExpenses() {
+  const { user } = useAuth();
   const [recurringExpenses, setRecurringExpenses] = useState([]);
   const [categories, setCategories] = useState([]);
   const [showModal, setShowModal] = useState(false);
@@ -17,14 +19,18 @@ function RecurringExpenses() {
   });
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (user && user.id) {
+      loadData();
+    }
+  }, [user]);
 
   const loadData = () => {
-    const recurring = getRecurringExpenses();
+    if (!user || !user.id) return;
+    
+    const recurring = getRecurringExpenses(user.id);
     setRecurringExpenses(recurring);
 
-    const cats = getCategories();
+    const cats = getCategories(user.id);
     setCategories(cats);
   };
 
@@ -36,6 +42,8 @@ function RecurringExpenses() {
       return;
     }
 
+    if (!user || !user.id) return;
+
     const expenseData = {
       ...formData,
       amount: parseFloat(formData.amount),
@@ -43,12 +51,14 @@ function RecurringExpenses() {
       next_occurrence: formData.start_date
     };
 
-    addRecurringExpense(expenseData);
+    addRecurringExpense(expenseData, user.id);
     resetForm();
     loadData();
   };
 
   const handleProcess = (recurring) => {
+    if (!user || !user.id) return;
+    
     if (confirm('Create transaction from this recurring expense?')) {
       const expense = {
         amount: recurring.amount,
@@ -60,7 +70,7 @@ function RecurringExpenses() {
         tags: 'recurring'
       };
 
-      addExpense(expense);
+      addExpense(expense, user.id);
 
       const nextDate = calculateNextOccurrence(recurring.next_occurrence, recurring.frequency);
       updateRecurringExpenseNextOccurrence(recurring.id, nextDate);

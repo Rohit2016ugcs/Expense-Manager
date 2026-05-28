@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { getExpenses, addExpense, updateExpense, deleteExpense, getCategories } from '../utils/db';
+import { useAuth } from '../context/AuthContext';
 
 function Expenses() {
+  const { user } = useAuth();
   const [expenses, setExpenses] = useState([]);
   const [categories, setCategories] = useState([]);
   const [showModal, setShowModal] = useState(false);
@@ -25,10 +27,14 @@ function Expenses() {
   });
 
   useEffect(() => {
-    loadData();
-  }, [filters]);
+    if (user && user.id) {
+      loadData();
+    }
+  }, [filters, user]);
 
   const loadData = () => {
+    if (!user || !user.id) return;
+    
     const filterParams = {};
     if (filters.type) filterParams.type = filters.type;
     if (filters.category_id) filterParams.category_id = parseInt(filters.category_id);
@@ -36,10 +42,10 @@ function Expenses() {
     if (filters.startDate) filterParams.startDate = filters.startDate;
     if (filters.endDate) filterParams.endDate = filters.endDate;
 
-    const expensesList = getExpenses(filterParams);
+    const expensesList = getExpenses(user.id, filterParams);
     setExpenses(expensesList);
 
-    const cats = getCategories();
+    const cats = getCategories(user.id);
     setCategories(cats);
   };
 
@@ -51,6 +57,8 @@ function Expenses() {
       return;
     }
 
+    if (!user || !user.id) return;
+
     const expenseData = {
       ...formData,
       amount: parseFloat(formData.amount),
@@ -60,7 +68,7 @@ function Expenses() {
     if (editingExpense) {
       updateExpense(editingExpense.id, expenseData);
     } else {
-      addExpense(expenseData);
+      addExpense(expenseData, user.id);
     }
 
     resetForm();

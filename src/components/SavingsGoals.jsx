@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { getSavingsGoals, addSavingsGoal, updateSavingsGoal, deleteSavingsGoal } from '../utils/db';
+import { useAuth } from '../context/AuthContext';
 
 function SavingsGoals() {
+  const { user } = useAuth();
   const [goals, setGoals] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editingGoal, setEditingGoal] = useState(null);
@@ -14,11 +16,14 @@ function SavingsGoals() {
   });
 
   useEffect(() => {
-    loadGoals();
-  }, []);
+    if (user && user.id) {
+      loadGoals();
+    }
+  }, [user]);
 
   const loadGoals = () => {
-    const goalsList = getSavingsGoals();
+    if (!user || !user.id) return;
+    const goalsList = getSavingsGoals(user.id);
     setGoals(goalsList);
   };
 
@@ -30,6 +35,8 @@ function SavingsGoals() {
       return;
     }
 
+    if (!user || !user.id) return;
+
     const goalData = {
       ...formData,
       target_amount: parseFloat(formData.target_amount),
@@ -39,7 +46,7 @@ function SavingsGoals() {
     if (editingGoal) {
       updateSavingsGoal(editingGoal.id, goalData);
     } else {
-      addSavingsGoal(goalData);
+      addSavingsGoal(goalData, user.id);
     }
 
     resetForm();

@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { getExpenses, getCategoryStatistics, getStatistics } from '../utils/db';
+import { useAuth } from '../context/AuthContext';
 
 function Reports() {
+  const { user } = useAuth();
   const [reportType, setReportType] = useState('summary');
   const [period, setPeriod] = useState('month');
   const [stats, setStats] = useState(null);
@@ -9,20 +11,24 @@ function Reports() {
   const [expenses, setExpenses] = useState([]);
 
   useEffect(() => {
-    loadReportData();
-  }, [reportType, period]);
+    if (user && user.id) {
+      loadReportData();
+    }
+  }, [reportType, period, user]);
 
   const loadReportData = () => {
+    if (!user || !user.id) return;
+
     const { startDate, endDate } = getDateRange(period);
 
-    const statistics = getStatistics(startDate, endDate);
+    const statistics = getStatistics(user.id, startDate, endDate);
     setStats(statistics);
 
-    const catStatsExpense = getCategoryStatistics(startDate, endDate, 'expense');
-    const catStatsIncome = getCategoryStatistics(startDate, endDate, 'income');
+    const catStatsExpense = getCategoryStatistics(user.id, startDate, endDate, 'expense');
+    const catStatsIncome = getCategoryStatistics(user.id, startDate, endDate, 'income');
     setCategoryStats({ expense: catStatsExpense, income: catStatsIncome });
 
-    const allExpenses = getExpenses({ startDate, endDate });
+    const allExpenses = getExpenses(user.id, { startDate, endDate });
     setExpenses(allExpenses);
   };
 
