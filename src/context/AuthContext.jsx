@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { loginUser, registerUser, getCurrentUser, logoutUser } from '../utils/auth';
+import { initDB } from '../utils/db';
 
 const AuthContext = createContext();
 
@@ -14,14 +15,26 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [dbReady, setDbReady] = useState(false);
 
   useEffect(() => {
-    // Check if user is already logged in
-    const currentUser = getCurrentUser();
-    if (currentUser) {
-      setUser(currentUser);
-    }
-    setLoading(false);
+    const initialize = async () => {
+      // Initialize database first
+      const dbInitialized = await initDB();
+      setDbReady(dbInitialized);
+      
+      if (dbInitialized) {
+        // Then check if user is already logged in
+        const currentUser = getCurrentUser();
+        if (currentUser) {
+          setUser(currentUser);
+        }
+      }
+      
+      setLoading(false);
+    };
+    
+    initialize();
   }, []);
 
   const login = async (email, password) => {
@@ -61,6 +74,7 @@ export const AuthProvider = ({ children }) => {
     signup,
     logout,
     loading,
+    dbReady,
     isAuthenticated: !!user
   };
 

@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react';
-import { initDB } from './utils/db';
+import { useState } from 'react';
 import { useAuth } from './context/AuthContext';
 import Auth from './components/Auth';
 import Dashboard from './components/Dashboard';
@@ -15,20 +14,9 @@ import './App.css';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [isLoading, setIsLoading] = useState(true);
-  const [isDbReady, setIsDbReady] = useState(false);
-  const { user, logout, loading: authLoading } = useAuth();
+  const { user, logout, loading: authLoading, dbReady } = useAuth();
 
-  useEffect(() => {
-    const initialize = async () => {
-      const dbInitialized = await initDB();
-      setIsDbReady(dbInitialized);
-      setIsLoading(false);
-    };
-    initialize();
-  }, []);
-
-  if (isLoading || authLoading) {
+  if (authLoading) {
     return (
       <div className="loading-screen">
         <div className="loader"></div>
@@ -37,7 +25,7 @@ function App() {
     );
   }
 
-  if (!isDbReady) {
+  if (!dbReady) {
     return (
       <div className="error-screen">
         <p>⚠️ Failed to initialize database. Please refresh the page.</p>
