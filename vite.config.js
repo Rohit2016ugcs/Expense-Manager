@@ -9,6 +9,10 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
+      injectRegister: 'auto',
+      devOptions: {
+        enabled: false
+      },
       manifest: {
         name: 'Expense Manager',
         short_name: 'Expenses',
