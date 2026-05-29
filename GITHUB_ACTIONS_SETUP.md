@@ -223,6 +223,25 @@ vercel alias set ${{ steps.deploy.outputs.deployment_url }} yourdomain.com
 
 ## 🐛 Troubleshooting
 
+### Error: "No existing credentials found"
+**This is the most common error!**
+
+**Symptoms:**
+```
+Error: No existing credentials found. Please run `vercel login` or pass "--token"
+Error: Process completed with exit code 1.
+```
+
+**Cause:** GitHub Secrets are not configured
+
+**Solution:** See **VERCEL_DEPLOY_FIX.md** for detailed fix instructions
+
+Quick fix:
+1. Create Vercel token at [vercel.com/account/tokens](https://vercel.com/account/tokens)
+2. Run `vercel link` locally and get IDs from `.vercel/project.json`
+3. Add all 3 secrets to GitHub: `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`
+4. Re-run the workflow
+
 ### Error: "Invalid token"
 **Solution**: 
 - Regenerate Vercel token
@@ -250,6 +269,12 @@ vercel alias set ${{ steps.deploy.outputs.deployment_url }} yourdomain.com
 - Ensure workflow file is in `.github/workflows/` directory
 - Check GitHub Actions is enabled in repository settings
 - Verify secrets are properly set
+
+### Secrets verification fails
+**Solution**:
+- The workflow now checks for missing secrets before deploying
+- Follow error messages to add missing secrets
+- Ensure secret names match exactly (case-sensitive)
 
 ---
 

@@ -32,16 +32,34 @@ jobs:
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
 
+      - name: Verify Secrets
+        run: |
+          if [ -z "${{ secrets.VERCEL_TOKEN }}" ]; then
+            echo "❌ Error: VERCEL_TOKEN secret is not set!"
+            echo "Please add VERCEL_TOKEN to your GitHub repository secrets."
+            echo "See GITHUB_ACTIONS_SETUP.md for instructions."
+            exit 1
+          fi
+          if [ -z "${{ secrets.VERCEL_ORG_ID }}" ]; then
+            echo "❌ Error: VERCEL_ORG_ID secret is not set!"
+            exit 1
+          fi
+          if [ -z "${{ secrets.VERCEL_PROJECT_ID }}" ]; then
+            echo "❌ Error: VERCEL_PROJECT_ID secret is not set!"
+            exit 1
+          fi
+          echo "✅ All required secrets are configured"
+
       - name: Pull Vercel Environment Information
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        run: vercel pull --yes --environment=production --token="${{ secrets.VERCEL_TOKEN }}"
 
       - name: Build Project Artifacts
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        run: vercel build --prod --token="${{ secrets.VERCEL_TOKEN }}"
 
       - name: Deploy Project Artifacts to Vercel
         id: deploy
         run: |
-          DEPLOYMENT_URL=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          DEPLOYMENT_URL=$(vercel deploy --prebuilt --prod --token="${{ secrets.VERCEL_TOKEN }}")
           echo "deployment_url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
           echo "Deployed to: $DEPLOYMENT_URL"
 
@@ -50,11 +68,11 @@ jobs:
         run: |
           RELEASE_TAG=${{ github.event.release.tag_name }}
           ALIAS_URL="expense-manager-${RELEASE_TAG}.vercel.app"
-          vercel alias set ${{ steps.deploy.outputs.deployment_url }} $ALIAS_URL --token=${{ secrets.VERCEL_TOKEN }}
+          vercel alias set ${{ steps.deploy.outputs.deployment_url }} $ALIAS_URL --token="${{ secrets.VERCEL_TOKEN }}"
           echo "Alias set to: $ALIAS_URL"
           
           # Also set a stable production alias
-          vercel alias set ${{ steps.deploy.outputs.deployment_url }} expense-manager.vercel.app --token=${{ secrets.VERCEL_TOKEN }}
+          vercel alias set ${{ steps.deploy.outputs.deployment_url }} expense-manager.vercel.app --token="${{ secrets.VERCEL_TOKEN }}"
           echo "Production alias: expense-manager.vercel.app"
 
       - name: Comment on Release
