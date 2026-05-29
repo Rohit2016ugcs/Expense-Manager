@@ -1,0 +1,95 @@
+name: Deploy to Vercel on Release
+
+on:
+  release:
+    types: [published]
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel Environment Information
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build Project Artifacts
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy Project Artifacts to Vercel
+        id: deploy
+        run: |
+          DEPLOYMENT_URL=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          echo "deployment_url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
+          echo "Deployed to: $DEPLOYMENT_URL"
+
+      - name: Assign Alias
+        if: github.event_name == 'release'
+        run: |
+          RELEASE_TAG=${{ github.event.release.tag_name }}
+          ALIAS_URL="expense-manager-${RELEASE_TAG}.vercel.app"
+          vercel alias set ${{ steps.deploy.outputs.deployment_url }} $ALIAS_URL --token=${{ secrets.VERCEL_TOKEN }}
+          echo "Alias set to: $ALIAS_URL"
+          
+          # Also set a stable production alias
+          vercel alias set ${{ steps.deploy.outputs.deployment_url }} expense-manager.vercel.app --token=${{ secrets.VERCEL_TOKEN }}
+          echo "Production alias: expense-manager.vercel.app"
+
+      - name: Comment on Release
+        if: github.event_name == 'release'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const releaseTag = context.payload.release.tag_name;
+            const deploymentUrl = '${{ steps.deploy.outputs.deployment_url }}';
+            const aliasUrl = `expense-manager-${releaseTag}.vercel.app`;
+            
+            github.rest.repos.createReleaseAsset({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: context.payload.release.id,
+              name: 'deployment-info.txt',
+              data: `Deployment URL: ${deploymentUrl}\nAlias URL: https://${aliasUrl}\nProduction URL: https://expense-manager.vercel.app`
+            });
+            
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.release.id,
+              body: `🚀 **Deployment Successful!**\n\n✅ **Production URL**: https://expense-manager.vercel.app\n✅ **Release Alias**: https://${aliasUrl}\n✅ **Direct URL**: ${deploymentUrl}\n\nYour release has been deployed to Vercel!`
+            });
+
+      - name: Deployment Summary
+        run: |
+          echo "## Deployment Summary 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deployment URL**: ${{ steps.deploy.outputs.deployment_url }}" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.event_name }}" == "release" ]; then
+            echo "- **Release Alias**: expense-manager-${{ github.event.release.tag_name }}.vercel.app" >> $GITHUB_STEP_SUMMARY
+            echo "- **Production Alias**: expense-manager.vercel.app" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Deployment completed successfully!" >> $GITHUB_STEP_SUMMARY
