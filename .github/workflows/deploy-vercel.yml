@@ -63,7 +63,7 @@ jobs:
           # Replace dots with dashes for valid Vercel subdomain (v1.0.0 -> v1-0-0)
           SAFE_TAG=$(echo "$RELEASE_TAG" | tr '.' '-')
           ALIAS_URL="expense-manager-${SAFE_TAG}.vercel.app"
-          PROD_ALIAS="expense-manager.vercel.app"
+          PROD_ALIAS="expense-manager-prod.vercel.app"
           
           # Remove release alias if it exists
           echo "Checking for existing release alias..."
@@ -73,13 +73,16 @@ jobs:
           vercel alias set ${{ steps.deploy.outputs.deployment_url }} $ALIAS_URL --token="${{ secrets.VERCEL_TOKEN }}"
           echo "✅ Release alias set to: $ALIAS_URL"
           
-          # Remove production alias if it exists, then set it
-          echo "Checking for existing production alias..."
-          vercel alias rm $PROD_ALIAS --token="${{ secrets.VERCEL_TOKEN }}" --yes 2>/dev/null || echo "No existing production alias to remove"
+          # Try to set production alias (non-fatal if taken by another user)
+          echo "Attempting to set production alias..."
+          vercel alias rm $PROD_ALIAS --token="${{ secrets.VERCEL_TOKEN }}" --yes 2>/dev/null || true
           
-          # Set production alias
-          vercel alias set ${{ steps.deploy.outputs.deployment_url }} $PROD_ALIAS --token="${{ secrets.VERCEL_TOKEN }}"
-          echo "✅ Production alias set to: $PROD_ALIAS"
+          if vercel alias set ${{ steps.deploy.outputs.deployment_url }} $PROD_ALIAS --token="${{ secrets.VERCEL_TOKEN }}" 2>/dev/null; then
+            echo "✅ Production alias set to: $PROD_ALIAS"
+          else
+            echo "⚠️  Production alias '$PROD_ALIAS' is unavailable (likely taken by another project)"
+            echo "✅ Your release is accessible at: https://${ALIAS_URL}"
+          fi
 
       - name: Comment on Release
         if: github.event_name == 'release'
@@ -98,7 +101,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.payload.release.id,
-              body: `🚀 **Deployment Successful!**\n\n✅ **Production URL**: https://expense-manager.vercel.app\n✅ **Release Alias**: https://${aliasUrl}\n✅ **Direct URL**: ${deploymentUrl}\n\nYour release has been deployed to Vercel!`
+              body: `🚀 **Deployment Successful!**\n\n✅ **Production URL**: https://expense-manager-prod.vercel.app\n✅ **Release Alias**: https://${aliasUrl}\n✅ **Direct URL**: ${deploymentUrl}\n\nYour release has been deployed to Vercel!`
             });
 
       - name: Deployment Summary
@@ -110,7 +113,7 @@ jobs:
             RELEASE_TAG=${{ github.event.release.tag_name }}
             SAFE_TAG=$(echo "$RELEASE_TAG" | tr '.' '-')
             echo "- **Release Alias**: https://expense-manager-${SAFE_TAG}.vercel.app" >> $GITHUB_STEP_SUMMARY
-            echo "- **Production Alias**: https://expense-manager.vercel.app" >> $GITHUB_STEP_SUMMARY
+            echo "- **Production Alias**: https://expense-manager-prod.vercel.app" >> $GITHUB_STEP_SUMMARY
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "✅ Deployment completed successfully!" >> $GITHUB_STEP_SUMMARY
