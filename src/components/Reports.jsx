@@ -16,19 +16,19 @@ function Reports() {
     }
   }, [reportType, period, user]);
 
-  const loadReportData = () => {
+  const loadReportData = async () => {
     if (!user || !user.id) return;
 
     const { startDate, endDate } = getDateRange(period);
 
-    const statistics = getStatistics(user.id, startDate, endDate);
+    const statistics = await getStatistics(user.id, startDate, endDate);
     setStats(statistics);
 
-    const catStatsExpense = getCategoryStatistics(user.id, startDate, endDate, 'expense');
-    const catStatsIncome = getCategoryStatistics(user.id, startDate, endDate, 'income');
+    const catStatsExpense = await getCategoryStatistics(user.id, startDate, endDate, 'expense');
+    const catStatsIncome = await getCategoryStatistics(user.id, startDate, endDate, 'income');
     setCategoryStats({ expense: catStatsExpense, income: catStatsIncome });
 
-    const allExpenses = getExpenses(user.id, { startDate, endDate });
+    const allExpenses = await getExpenses(user.id, { startDate, endDate });
     setExpenses(allExpenses);
   };
 

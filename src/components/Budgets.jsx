@@ -20,32 +20,32 @@ function Budgets() {
     }
   }, [user]);
 
-  const loadData = () => {
+  const loadData = async () => {
     if (!user || !user.id) return;
     
-    const budgetsList = getBudgets(user.id);
-    const budgetsWithSpent = budgetsList.map(budget => {
-      const spent = calculateSpent(budget);
+    const budgetsList = await getBudgets(user.id);
+    const budgetsWithSpent = await Promise.all(budgetsList.map(async budget => {
+      const spent = await calculateSpent(budget);
       return { ...budget, spent };
-    });
+    }));
     setBudgets(budgetsWithSpent);
 
-    const cats = getCategories(user.id, 'expense');
+    const cats = await getCategories(user.id, 'expense');
     setCategories(cats);
   };
 
-  const calculateSpent = (budget) => {
+  const calculateSpent = async (budget) => {
     if (!user || !user.id) return 0;
     
     const { start_date, end_date, category_id } = budget;
     const filters = { startDate: start_date, endDate: end_date, type: 'expense' };
     if (category_id) filters.category_id = category_id;
 
-    const expenses = getExpenses(user.id, filters);
+    const expenses = await getExpenses(user.id, filters);
     return expenses.reduce((sum, exp) => sum + exp.amount, 0);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!formData.amount) {
@@ -66,9 +66,9 @@ function Budgets() {
       alert_threshold: parseFloat(formData.alert_threshold)
     };
 
-    addBudget(budgetData, user.id);
+    await addBudget(budgetData, user.id);
     resetForm();
-    loadData();
+    await loadData();
   };
 
   const getDateRange = (period) => {
@@ -102,10 +102,10 @@ function Budgets() {
     };
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (confirm('Are you sure you want to delete this budget?')) {
-      deleteBudget(id);
-      loadData();
+      await deleteBudget(id, user.id);
+      await loadData();
     }
   };
 

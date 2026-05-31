@@ -21,13 +21,13 @@ function SavingsGoals() {
     }
   }, [user]);
 
-  const loadGoals = () => {
+  const loadGoals = async () => {
     if (!user || !user.id) return;
-    const goalsList = getSavingsGoals(user.id);
+    const goalsList = await getSavingsGoals(user.id);
     setGoals(goalsList);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!formData.name || !formData.target_amount) {
@@ -44,13 +44,13 @@ function SavingsGoals() {
     };
 
     if (editingGoal) {
-      updateSavingsGoal(editingGoal.id, goalData);
+      await updateSavingsGoal(editingGoal.id, goalData, user.id);
     } else {
-      addSavingsGoal(goalData, user.id);
+      await addSavingsGoal(goalData, user.id);
     }
 
     resetForm();
-    loadGoals();
+    await loadGoals();
   };
 
   const handleEdit = (goal) => {
@@ -65,22 +65,22 @@ function SavingsGoals() {
     setShowModal(true);
   };
 
-  const handleAddAmount = (goal) => {
+  const handleAddAmount = async (goal) => {
     const amount = prompt('Enter amount to add:');
     if (amount && !isNaN(amount)) {
       const updatedGoal = {
         ...goal,
         current_amount: goal.current_amount + parseFloat(amount)
       };
-      updateSavingsGoal(goal.id, updatedGoal);
-      loadGoals();
+      await updateSavingsGoal(goal.id, updatedGoal, user.id);
+      await loadGoals();
     }
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (confirm('Are you sure you want to delete this savings goal?')) {
-      deleteSavingsGoal(id);
-      loadGoals();
+      await deleteSavingsGoal(id, user.id);
+      await loadGoals();
     }
   };
 

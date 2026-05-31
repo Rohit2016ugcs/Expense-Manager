@@ -24,17 +24,17 @@ function RecurringExpenses() {
     }
   }, [user]);
 
-  const loadData = () => {
+  const loadData = async () => {
     if (!user || !user.id) return;
     
-    const recurring = getRecurringExpenses(user.id);
+    const recurring = await getRecurringExpenses(user.id);
     setRecurringExpenses(recurring);
 
-    const cats = getCategories(user.id);
+    const cats = await getCategories(user.id);
     setCategories(cats);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!formData.amount || !formData.category_id) {
@@ -51,12 +51,12 @@ function RecurringExpenses() {
       next_occurrence: formData.start_date
     };
 
-    addRecurringExpense(expenseData, user.id);
+    await addRecurringExpense(expenseData, user.id);
     resetForm();
-    loadData();
+    await loadData();
   };
 
-  const handleProcess = (recurring) => {
+  const handleProcess = async (recurring) => {
     if (!user || !user.id) return;
     
     if (confirm('Create transaction from this recurring expense?')) {
@@ -70,13 +70,13 @@ function RecurringExpenses() {
         tags: 'recurring'
       };
 
-      addExpense(expense, user.id);
+      await addExpense(expense, user.id);
 
       const nextDate = calculateNextOccurrence(recurring.next_occurrence, recurring.frequency);
-      updateRecurringExpenseNextOccurrence(recurring.id, nextDate);
+      await updateRecurringExpenseNextOccurrence(recurring.id, nextDate, user.id);
 
       alert('Transaction created successfully!');
-      loadData();
+      await loadData();
     }
   };
 
@@ -101,10 +101,10 @@ function RecurringExpenses() {
     return date.toISOString().split('T')[0];
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (confirm('Are you sure you want to delete this recurring expense?')) {
-      deleteRecurringExpense(id);
-      loadData();
+      await deleteRecurringExpense(id, user.id);
+      await loadData();
     }
   };
 

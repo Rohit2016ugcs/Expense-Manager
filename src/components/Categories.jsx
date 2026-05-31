@@ -27,13 +27,13 @@ function Categories() {
     }
   }, [user]);
 
-  const loadCategories = () => {
+  const loadCategories = async () => {
     if (!user || !user.id) return;
-    const cats = getCategories(user.id);
+    const cats = await getCategories(user.id);
     setCategories(cats);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!formData.name) {
@@ -50,12 +50,12 @@ function Categories() {
 
     try {
       if (editingCategory) {
-        updateCategory(editingCategory.id, categoryData);
+        await updateCategory(editingCategory.id, categoryData, user.id);
       } else {
-        addCategory(categoryData, user.id);
+        await addCategory(categoryData, user.id);
       }
       resetForm();
-      loadCategories();
+      await loadCategories();
     } catch (error) {
       alert('Error: Category name already exists');
     }
@@ -73,10 +73,10 @@ function Categories() {
     setShowModal(true);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (confirm('Are you sure? This will affect all related transactions.')) {
-      deleteCategory(id);
-      loadCategories();
+      await deleteCategory(id, user.id);
+      await loadCategories();
     }
   };
 
