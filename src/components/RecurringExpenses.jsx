@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getRecurringExpenses, addRecurringExpense, deleteRecurringExpense, updateRecurringExpenseNextOccurrence, getCategories, addExpense } from '../utils/db';
+import { getRecurringExpenses, addRecurringExpense, deleteRecurringExpense, updateRecurringExpenseNextOccurrence, getCategories, addExpense } from '../utils/api-adapter';
 import { useAuth } from '../context/AuthContext';
 
 function RecurringExpenses() {

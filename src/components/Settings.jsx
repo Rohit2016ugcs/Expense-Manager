@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { exportData, importData, clearAllData } from '../utils/db';
+import { exportData, importData, clearAllData } from '../utils/api-adapter';
 
 function Settings() {
   const [activeSection, setActiveSection] = useState('data');

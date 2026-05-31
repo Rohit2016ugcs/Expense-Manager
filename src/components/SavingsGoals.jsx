@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getSavingsGoals, addSavingsGoal, updateSavingsGoal, deleteSavingsGoal } from '../utils/db';
+import { getSavingsGoals, addSavingsGoal, updateSavingsGoal, deleteSavingsGoal } from '../utils/api-adapter';
 import { useAuth } from '../context/AuthContext';
 
 function SavingsGoals() {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getStatistics, getCategoryStatistics, getDailyStatistics, getExpenses } from '../utils/db';
+import { getStatistics, getCategoryStatistics, getDailyStatistics, getExpenses } from '../utils/api-adapter';
 import { useAuth } from '../context/AuthContext';
 import { PieChart, Pie, Cell, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 

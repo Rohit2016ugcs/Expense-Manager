@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getExpenses, getCategoryStatistics, getStatistics } from '../utils/db';
+import { getExpenses, getCategoryStatistics, getStatistics } from '../utils/api-adapter';
 import { useAuth } from '../context/AuthContext';
 
 function Reports() {

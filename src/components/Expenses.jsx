@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getExpenses, addExpense, updateExpense, deleteExpense, getCategories } from '../utils/db';
+import { getExpenses, addExpense, updateExpense, deleteExpense, getCategories } from '../utils/api-adapter';
 import { useAuth } from '../context/AuthContext';
 
 function Expenses() {
@@ -32,7 +32,7 @@ function Expenses() {
     }
   }, [filters, user]);
 
-  const loadData = () => {
+  const loadData = async () => {
     if (!user || !user.id) return;
     
     const filterParams = {};
@@ -42,14 +42,14 @@ function Expenses() {
     if (filters.startDate) filterParams.startDate = filters.startDate;
     if (filters.endDate) filterParams.endDate = filters.endDate;
 
-    const expensesList = getExpenses(user.id, filterParams);
+    const expensesList = await getExpenses(user.id, filterParams);
     setExpenses(expensesList);
 
-    const cats = getCategories(user.id);
+    const cats = await getCategories(user.id);
     setCategories(cats);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (!formData.amount || !formData.category_id) {
@@ -65,14 +65,19 @@ function Expenses() {
       category_id: parseInt(formData.category_id)
     };
 
-    if (editingExpense) {
-      updateExpense(editingExpense.id, expenseData);
-    } else {
-      addExpense(expenseData, user.id);
-    }
+    try {
+      if (editingExpense) {
+        await updateExpense(editingExpense.id, expenseData, user.id);
+      } else {
+        await addExpense(expenseData, user.id);
+      }
 
-    resetForm();
-    loadData();
+      resetForm();
+      await loadData();
+    } catch (error) {
+      console.error('Error saving expense:', error);
+      alert('Failed to save transaction. Please try again.');
+    }
   };
 
   const handleEdit = (expense) => {
@@ -89,10 +94,15 @@ function Expenses() {
     setShowModal(true);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (confirm('Are you sure you want to delete this transaction?')) {
-      deleteExpense(id);
-      loadData();
+      try {
+        await deleteExpense(id, user.id);
+        await loadData();
+      } catch (error) {
+        console.error('Error deleting expense:', error);
+        alert('Failed to delete transaction. Please try again.');
+      }
     }
   };
 

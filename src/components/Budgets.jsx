@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getBudgets, addBudget, deleteBudget, getCategories, getExpenses } from '../utils/db';
+import { getBudgets, addBudget, deleteBudget, getCategories, getExpenses } from '../utils/api-adapter';
 import { useAuth } from '../context/AuthContext';
 
 function Budgets() {

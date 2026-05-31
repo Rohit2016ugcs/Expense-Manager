@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getCategories, addCategory, updateCategory, deleteCategory } from '../utils/db';
+import { getCategories, addCategory, updateCategory, deleteCategory } from '../utils/api-adapter';
 import { useAuth } from '../context/AuthContext';
 
 function Categories() {
