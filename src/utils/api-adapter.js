@@ -252,3 +252,19 @@ export const saveDB = () => {
   }
   // Cloud backend auto-saves
 };
+
+// Data export/import (for Settings page - uses local db functions)
+export const exportData = async () => {
+  const { exportData: localExport } = await import('./db');
+  return localExport();
+};
+
+export const importData = async (data) => {
+  const { importData: localImport } = await import('./db');
+  return localImport(data);
+};
+
+export const clearAllData = async () => {
+  const { clearAllData: localClear } = await import('./db');
+  return localClear();
+};
