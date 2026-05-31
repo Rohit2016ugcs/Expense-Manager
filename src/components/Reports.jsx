@@ -7,7 +7,7 @@ function Reports() {
   const [reportType, setReportType] = useState('summary');
   const [period, setPeriod] = useState('month');
   const [stats, setStats] = useState(null);
-  const [categoryStats, setCategoryStats] = useState([]);
+  const [categoryStats, setCategoryStats] = useState({ expense: [], income: [] });
   const [expenses, setExpenses] = useState([]);
 
   useEffect(() => {
