@@ -1,11 +1,11 @@
-import { createConnection } from '@vercel/postgres';
+import { sql } from '@vercel/postgres';
 import bcrypt from 'bcryptjs';
 
-// Support both prefixed and unprefixed environment variables
-const POSTGRES_URL = process.env.POSTGRES_URL || process.env.Expense_Manager_POSTGRES_URL;
-const sql = createConnection({ connectionString: POSTGRES_URL });
-
 export default async function handler(req, res) {
+  // Support both prefixed and unprefixed environment variables
+  if (!process.env.POSTGRES_URL && process.env.Expense_Manager_POSTGRES_URL) {
+    process.env.POSTGRES_URL = process.env.Expense_Manager_POSTGRES_URL;
+  }
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
